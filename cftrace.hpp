@@ -18,6 +18,16 @@
 namespace cftrace {
 
     namespace impl {
+        struct backend_if {
+            virtual void write(std::span<char> buffer) = 0;
+        };
+
+        struct backend {
+            static backend_if* get() { return instance; }
+            static void set(backend_if* b) { instance = b; }
+          private:
+            static backend_if* instance;
+        };
     }
 
     template <typename...Args>
@@ -58,18 +68,20 @@ namespace cftrace {
         serialize(buffer.subspan(sizeof(T)), args...);
     }
 
-    template <typename T>
-    constexpr std::span<char> serialize(T t) {
-        std::array<char, cftrace::size(t)> buf;
-        serialize(buf, t);
-        return std::span<char>(buf);
-    }
-
     template <typename T, typename... Args>
     constexpr std::span<char> serialize(T t, Args ... args) {
         static constexpr auto s = cftrace::size(t, args...);
         std::array<char, s> buf;
         serialize(std::span<char>(buf), t, args...);
         return std::span<char>(buf);
+    }
+
+    template <typename... Args>
+    void trace(Args... args) {
+        static char _buf[128];
+        auto s = cftrace::size(args...);
+        std::span<char> buf(_buf, s);
+        serialize(buf, args...);
+        impl::backend{}.get()->write(buf);
     }
 }

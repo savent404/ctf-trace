@@ -3,8 +3,10 @@
 
 using namespace std::string_view_literals;
 
+cftrace::impl::backend_if* cftrace::impl::backend::instance = nullptr;
+
 TEST(cftrace, pack) {
-    auto p = cftrace::pack(1, 2, 3, 4, 5);
+    constexpr auto p = cftrace::pack(1, 2, 3, 4, 5);
 
     ASSERT_EQ(std::tuple_size_v<decltype(p)>, 5);
     ASSERT_EQ(std::get<0>(p), 1);
@@ -35,4 +37,19 @@ TEST(cftrace, serialize) {
     ASSERT_EQ(*reinterpret_cast<int*>(buf.data()), 1);
     ASSERT_EQ(*reinterpret_cast<double*>(buf.data() + sizeof(int)), 1.0);
     ASSERT_EQ(*reinterpret_cast<float*>(buf.data() + sizeof(int) + sizeof(double)), 1.0f);
+}
+
+#include <iostream>
+struct backend_mock : cftrace::impl::backend_if {
+    virtual void write(std::span<char> buffer) override {
+        std::cout << "write: " << buffer.size() << std::endl;
+    }
+};
+
+TEST(cftrace, trace) {
+    auto backend = std::make_shared<backend_mock>();
+    cftrace::impl::backend::set(backend.get());
+
+    cftrace::trace(1, 2, 3, 4, 5);
+    cftrace::trace(1, std::string_view("Hello,World"));
 }
